@@ -12,6 +12,7 @@
  */
 
 import { Button } from '@/components/Button';
+import { QualityRating } from '@/components/QualityRating';
 import { BorderRadius, FontSizes, Spacing } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
 import { calculateDuration, formatDuration, formatTime, useSleepStorage } from '@/hooks/useSleepStorage';
@@ -49,6 +50,7 @@ export default function AddSleepScreen() {
         return date;
     });
     const [note, setNote] = useState('');
+    const [quality, setQuality] = useState<number>(3);
     const [isSaving, setIsSaving] = useState(false);
 
     // Time picker visibility (for Android)
@@ -105,7 +107,7 @@ export default function AddSleepScreen() {
 
         try {
             setIsSaving(true);
-            await addEntry(bedtime, wakeTime, note);
+            await addEntry(bedtime, wakeTime, note, quality);
 
             // Navigate back with success
             router.back();
@@ -236,6 +238,23 @@ export default function AddSleepScreen() {
                             {note.length}/200
                         </Text>
                     </View>
+
+                    {/* Quality Rating */}
+                    <View style={styles.qualitySection}>
+                        <View style={styles.pickerHeader}>
+                            <View style={[styles.iconBadge, { backgroundColor: '#FFD700' + '20' }]}>
+                                <Ionicons name="star" size={20} color="#FFD700" />
+                            </View>
+                            <Text style={[styles.pickerLabel, { color: colors.text }]}>Sleep Quality</Text>
+                        </View>
+                        <View style={[styles.qualityContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <QualityRating
+                                value={quality}
+                                onChange={setQuality}
+                                size="large"
+                            />
+                        </View>
+                    </View>
                 </ScrollView>
 
                 {/* Save Button */}
@@ -343,5 +362,14 @@ const styles = StyleSheet.create({
     },
     saveButton: {
         borderRadius: BorderRadius.lg,
+    },
+    qualitySection: {
+        marginBottom: Spacing.lg,
+    },
+    qualityContainer: {
+        borderWidth: 1,
+        borderRadius: BorderRadius.md,
+        padding: Spacing.lg,
+        alignItems: 'center',
     },
 });

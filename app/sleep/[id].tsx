@@ -13,6 +13,7 @@
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { Loading } from '@/components/Loading';
+import { QualityRating } from '@/components/QualityRating';
 import { BorderRadius, FontSizes, Spacing } from '@/constants/theme';
 import { useTheme } from '@/context/ThemeContext';
 import {
@@ -50,6 +51,7 @@ export default function SleepDetailScreen() {
     const [bedtime, setBedtime] = useState(new Date());
     const [wakeTime, setWakeTime] = useState(new Date());
     const [note, setNote] = useState('');
+    const [quality, setQuality] = useState<number | undefined>(undefined);
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -66,6 +68,7 @@ export default function SleepDetailScreen() {
             setBedtime(new Date(entry.bedtime));
             setWakeTime(new Date(entry.wakeTime));
             setNote(entry.note || '');
+            setQuality(entry.quality);
         }
     }, [entry?.id]);
 
@@ -126,7 +129,7 @@ export default function SleepDetailScreen() {
 
         try {
             setIsSaving(true);
-            await updateEntry(id, bedtime, wakeTime, note);
+            await updateEntry(id, bedtime, wakeTime, note, quality);
             setIsEditing(false);
             Alert.alert('Success', 'Sleep entry updated successfully.');
         } catch (error) {
@@ -331,6 +334,34 @@ export default function SleepDetailScreen() {
                             </Text>
                         )}
                     </View>
+
+                    {/* Quality Section */}
+                    <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <View style={styles.sectionHeader}>
+                            <View style={[styles.iconBadge, { backgroundColor: '#FFD700' + '20' }]}>
+                                <Ionicons name="star" size={20} color="#FFD700" />
+                            </View>
+                            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Sleep Quality</Text>
+                        </View>
+
+                        {isEditing ? (
+                            <View style={styles.qualityContainer}>
+                                <QualityRating
+                                    value={quality}
+                                    onChange={setQuality}
+                                    size="large"
+                                />
+                            </View>
+                        ) : (
+                            <View style={styles.qualityContainer}>
+                                <QualityRating
+                                    value={entry.quality}
+                                    readonly
+                                    size="medium"
+                                />
+                            </View>
+                        )}
+                    </View>
                 </ScrollView>
 
                 {/* Action Buttons */}
@@ -489,5 +520,9 @@ const styles = StyleSheet.create({
     },
     editButton: {
         flex: 1,
+    },
+    qualityContainer: {
+        alignItems: 'center',
+        paddingVertical: Spacing.sm,
     },
 });

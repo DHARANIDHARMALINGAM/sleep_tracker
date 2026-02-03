@@ -12,6 +12,7 @@ import { SleepEntry } from '@/types/sleep';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { QualityBadge } from './QualityRating';
 
 interface SleepCardProps {
     entry: SleepEntry;
@@ -77,6 +78,13 @@ export function SleepCard({ entry, onPress, showDate = true }: SleepCardProps) {
                     <Text style={[styles.noteText, { color: colors.textSecondary }]} numberOfLines={2}>
                         {entry.note}
                     </Text>
+                </View>
+            )}
+
+            {/* Quality Badge */}
+            {entry.quality && (
+                <View style={styles.qualityRow}>
+                    <QualityBadge quality={entry.quality} />
                 </View>
             )}
 
@@ -172,5 +180,9 @@ const styles = StyleSheet.create({
         position: 'absolute',
         right: Spacing.md,
         top: '50%',
+    },
+    qualityRow: {
+        marginTop: Spacing.sm,
+        alignItems: 'flex-start',
     },
 });

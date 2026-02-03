@@ -16,6 +16,8 @@ export interface SleepEntry {
     duration: number;
     /** Optional note about the sleep (e.g., "felt rested", "bad dreams") */
     note?: string;
+    /** Sleep quality rating from 1 (poor) to 5 (excellent) */
+    quality?: number;
 }
 
 /**

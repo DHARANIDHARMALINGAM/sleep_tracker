@@ -71,6 +71,7 @@ const toSleepEntry = (dbEntry: DbSleepEntry): SleepEntry => ({
     wakeTime: dbEntry.wake_time,
     duration: dbEntry.duration,
     note: dbEntry.note || undefined,
+    quality: dbEntry.quality || undefined,
 });
 
 /**
@@ -126,7 +127,8 @@ export function useSleepStorage() {
     const addEntry = useCallback(async (
         bedtime: Date,
         wakeTime: Date,
-        note?: string
+        note?: string,
+        quality?: number
     ): Promise<SleepEntry> => {
         if (!user) throw new Error('User not authenticated');
 
@@ -140,6 +142,7 @@ export function useSleepStorage() {
                 wake_time: wakeTime.toISOString(),
                 duration,
                 note: note?.trim() || null,
+                quality: quality || null,
             })
             .select()
             .single();
@@ -159,7 +162,8 @@ export function useSleepStorage() {
         id: string,
         bedtime: Date,
         wakeTime: Date,
-        note?: string
+        note?: string,
+        quality?: number
     ): Promise<SleepEntry | null> => {
         if (!user) throw new Error('User not authenticated');
 
@@ -172,6 +176,7 @@ export function useSleepStorage() {
                 wake_time: wakeTime.toISOString(),
                 duration,
                 note: note?.trim() || null,
+                quality: quality || null,
             })
             .eq('id', id)
             .eq('user_id', user.id)

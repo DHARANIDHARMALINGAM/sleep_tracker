@@ -62,5 +62,6 @@ export interface DbSleepEntry {
     wake_time: string;
     duration: number;
     note: string | null;
+    quality: number | null;
     created_at: string;
 }

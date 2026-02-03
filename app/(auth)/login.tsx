@@ -115,6 +115,15 @@ export default function LoginScreen() {
                             error={errors.password}
                         />
 
+                        <TouchableOpacity
+                            onPress={() => router.push('./forgot-password' as any)}
+                            style={styles.forgotPassword}
+                        >
+                            <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+                                Forgot Password?
+                            </Text>
+                        </TouchableOpacity>
+
                         <Button
                             title={loading ? 'Signing in...' : 'Sign In'}
                             onPress={handleLogin}
@@ -187,5 +196,14 @@ const styles = StyleSheet.create({
     footerLink: {
         fontSize: FontSizes.md,
         fontWeight: '600',
+    },
+    forgotPassword: {
+        alignSelf: 'flex-end',
+        marginTop: -Spacing.xs,
+        marginBottom: Spacing.sm,
+    },
+    forgotPasswordText: {
+        fontSize: FontSizes.sm,
+        fontWeight: '500',
     },
 });

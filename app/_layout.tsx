@@ -20,8 +20,10 @@ import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
+import { OnboardingModal } from '@/components/OnboardingModal';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import { useUserSettings } from '@/hooks/useUserSettings';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -71,11 +73,24 @@ export default function RootLayout() {
  * 
  * Configures conditionally based on auth state:
  * - Unauthenticated: Shows auth screens (welcome/login/signup)
- * - Authenticated: Shows main app with tabs
+ * - Authenticated: Shows main app with tabs + onboarding modal for new users
  */
 function RootLayoutNav() {
   const { colors, isDark } = useTheme();
   const { isAuthenticated, isLoading } = useAuth();
+  const { settings, loading: settingsLoading, completeOnboarding, needsOnboarding, updateSettings } = useUserSettings();
+
+  const handleOnboardingComplete = async (
+    targetHours: number,
+    reminderEnabled: boolean,
+    reminderTime: string
+  ) => {
+    await completeOnboarding(targetHours, reminderEnabled, reminderTime);
+  };
+
+  const handleOnboardingSkip = async () => {
+    await updateSettings({ onboardingCompleted: true });
+  };
 
   // Show loading screen while checking auth state
   if (isLoading) {
@@ -89,6 +104,16 @@ function RootLayoutNav() {
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+
+      {/* Onboarding Modal for new users */}
+      {isAuthenticated && !settingsLoading && needsOnboarding && (
+        <OnboardingModal
+          visible={needsOnboarding}
+          onComplete={handleOnboardingComplete}
+          onSkip={handleOnboardingSkip}
+        />
+      )}
+
       <Stack
         screenOptions={{
           headerStyle: {
@@ -141,3 +166,4 @@ function RootLayoutNav() {
     </>
   );
 }
+

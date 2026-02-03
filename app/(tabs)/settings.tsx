@@ -12,10 +12,15 @@ import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useSleepStorage } from '@/hooks/useSleepStorage';
+import { useUserSettings } from '@/hooks/useUserSettings';
+import { formatReminderTime } from '@/services/notifications';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState } from 'react';
 import {
     Alert,
+    Platform,
+    ScrollView,
     StyleSheet,
     Switch,
     Text,
@@ -28,7 +33,42 @@ export default function SettingsScreen() {
     const { colors, isDark, toggleTheme } = useTheme();
     const { signOut, user } = useAuth();
     const { clearAllData, entries } = useSleepStorage();
+    const { settings, updateSettings, loading: settingsLoading } = useUserSettings();
     const [isClearing, setIsClearing] = useState(false);
+    const [showTimePicker, setShowTimePicker] = useState(false);
+
+    const HOUR_OPTIONS = [5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
+
+    const handleTargetHoursChange = async (increment: number) => {
+        if (!settings) return;
+        const currentIndex = HOUR_OPTIONS.indexOf(settings.targetHours);
+        const newIndex = currentIndex + increment;
+        if (newIndex >= 0 && newIndex < HOUR_OPTIONS.length) {
+            await updateSettings({ targetHours: HOUR_OPTIONS[newIndex] });
+        }
+    };
+
+    const handleReminderToggle = async (enabled: boolean) => {
+        await updateSettings({ reminderEnabled: enabled });
+    };
+
+    const handleTimeChange = async (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowTimePicker(false);
+        }
+        if (selectedDate) {
+            const hours = selectedDate.getHours().toString().padStart(2, '0');
+            const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
+            await updateSettings({ reminderTime: `${hours}:${minutes}` });
+        }
+    };
+
+    const parseTimeToDate = (time: string): Date => {
+        const [hours, minutes] = time.split(':').map(Number);
+        const date = new Date();
+        date.setHours(hours, minutes, 0, 0);
+        return date;
+    };
 
     /**
      * Handle clearing all sleep data
@@ -69,7 +109,7 @@ export default function SettingsScreen() {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
-            <View style={styles.content}>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Appearance Section */}
                 <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                     Appearance
@@ -94,6 +134,112 @@ export default function SettingsScreen() {
                             thumbColor={isDark ? colors.primary : colors.surface}
                         />
                     </View>
+                </View>
+
+                {/* Sleep Goals Section */}
+                <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                    Sleep Goals
+                </Text>
+                <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    {/* Target Hours */}
+                    <View style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                        <View style={styles.settingInfo}>
+                            <View style={[styles.iconContainer, { backgroundColor: colors.primaryLight + '20' }]}>
+                                <Ionicons name="time-outline" size={20} color={colors.primary} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.settingLabel, { color: colors.text }]}>Target Hours</Text>
+                                <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                                    How many hours you want to sleep
+                                </Text>
+                            </View>
+                        </View>
+                        <View style={styles.hoursAdjuster}>
+                            <TouchableOpacity
+                                style={[styles.adjustButton, { backgroundColor: colors.primary + '15' }]}
+                                onPress={() => handleTargetHoursChange(-1)}
+                                disabled={settingsLoading || !settings || settings.targetHours === HOUR_OPTIONS[0]}
+                            >
+                                <Ionicons name="remove" size={18} color={colors.primary} />
+                            </TouchableOpacity>
+                            <Text style={[styles.hoursValue, { color: colors.primary }]}>
+                                {settings?.targetHours || 8}h
+                            </Text>
+                            <TouchableOpacity
+                                style={[styles.adjustButton, { backgroundColor: colors.primary + '15' }]}
+                                onPress={() => handleTargetHoursChange(1)}
+                                disabled={settingsLoading || !settings || settings.targetHours === HOUR_OPTIONS[HOUR_OPTIONS.length - 1]}
+                            >
+                                <Ionicons name="add" size={18} color={colors.primary} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Reminder Toggle */}
+                    <View style={[styles.settingRow, settings?.reminderEnabled ? { borderBottomWidth: 1, borderBottomColor: colors.border } : {}]}>
+                        <View style={styles.settingInfo}>
+                            <View style={[styles.iconContainer, { backgroundColor: '#FFD700' + '20' }]}>
+                                <Ionicons name="notifications-outline" size={20} color="#FFD700" />
+                            </View>
+                            <View>
+                                <Text style={[styles.settingLabel, { color: colors.text }]}>Bedtime Reminder</Text>
+                                <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                                    Get notified when it's time to sleep
+                                </Text>
+                            </View>
+                        </View>
+                        <Switch
+                            value={settings?.reminderEnabled || false}
+                            onValueChange={handleReminderToggle}
+                            trackColor={{ false: colors.border, true: colors.primaryLight }}
+                            thumbColor={settings?.reminderEnabled ? colors.primary : colors.surface}
+                            disabled={settingsLoading}
+                        />
+                    </View>
+
+                    {/* Reminder Time */}
+                    {settings?.reminderEnabled && (
+                        <View style={styles.settingRow}>
+                            <View style={styles.settingInfo}>
+                                <View style={[styles.iconContainer, { backgroundColor: 'transparent' }]} />
+                                <View>
+                                    <Text style={[styles.settingLabel, { color: colors.text }]}>Reminder Time</Text>
+                                    <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                                        When to remind you
+                                    </Text>
+                                </View>
+                            </View>
+                            {Platform.OS === 'ios' ? (
+                                <DateTimePicker
+                                    value={parseTimeToDate(settings.reminderTime)}
+                                    mode="time"
+                                    display="compact"
+                                    onChange={handleTimeChange}
+                                    themeVariant={isDark ? 'dark' : 'light'}
+                                />
+                            ) : (
+                                <>
+                                    <TouchableOpacity
+                                        style={[styles.timeButton, { backgroundColor: colors.primary + '15' }]}
+                                        onPress={() => setShowTimePicker(true)}
+                                    >
+                                        <Text style={[styles.timeButtonText, { color: colors.primary }]}>
+                                            {formatReminderTime(settings.reminderTime)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    {showTimePicker && (
+                                        <DateTimePicker
+                                            value={parseTimeToDate(settings.reminderTime)}
+                                            mode="time"
+                                            is24Hour={false}
+                                            display="default"
+                                            onChange={handleTimeChange}
+                                        />
+                                    )}
+                                </>
+                            )}
+                        </View>
+                    )}
                 </View>
 
                 {/* Data Section */}
@@ -203,7 +349,7 @@ export default function SettingsScreen() {
                         Track your sleep, improve your health
                     </Text>
                 </View>
-            </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
@@ -271,5 +417,32 @@ const styles = StyleSheet.create({
     },
     footerSubtext: {
         fontSize: FontSizes.sm,
+    },
+    hoursAdjuster: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+    },
+    adjustButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    hoursValue: {
+        fontSize: FontSizes.lg,
+        fontWeight: '700',
+        minWidth: 40,
+        textAlign: 'center',
+    },
+    timeButton: {
+        paddingHorizontal: Spacing.md,
+        paddingVertical: Spacing.sm,
+        borderRadius: BorderRadius.md,
+    },
+    timeButtonText: {
+        fontSize: FontSizes.md,
+        fontWeight: '600',
     },
 });

@@ -2,10 +2,11 @@
  * Root Layout
  * 
  * The root layout for the Sleep Tracker app.
- * Sets up the theme provider, loads fonts, and configures the navigation stack.
+ * Sets up the theme provider, auth provider, loads fonts, and configures navigation.
  * 
  * Navigation Structure:
- * - (tabs): Bottom tab navigator with Today, Stats, Settings
+ * - (auth): Authentication screens (welcome, login, signup) for unauthenticated users
+ * - (tabs): Bottom tab navigator with Today, Stats, Settings for authenticated users
  * - sleep/add: Modal for adding new sleep entries
  * - sleep/[id]: Dynamic route for viewing/editing sleep entry details
  */
@@ -16,8 +17,10 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 
 export {
@@ -27,7 +30,7 @@ export {
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  initialRouteName: '(auth)',
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -56,7 +59,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <RootLayoutNav />
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
     </ThemeProvider>
   );
 }
@@ -64,13 +69,22 @@ export default function RootLayout() {
 /**
  * Root Navigation Setup
  * 
- * Configures the Stack navigator with:
- * - Tab navigator as the main content
- * - Modal presentation for add sleep screen
- * - Detail screen for individual entries
+ * Configures conditionally based on auth state:
+ * - Unauthenticated: Shows auth screens (welcome/login/signup)
+ * - Authenticated: Shows main app with tabs
  */
 function RootLayoutNav() {
   const { colors, isDark } = useTheme();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // Show loading screen while checking auth state
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <>
@@ -89,8 +103,19 @@ function RootLayoutNav() {
           },
         }}
       >
-        {/* Main tab navigator - no header since tabs have their own */}
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* Auth screens for unauthenticated users */}
+        <Stack.Screen
+          name="(auth)"
+          options={{ headerShown: false }}
+          redirect={isAuthenticated}
+        />
+
+        {/* Main tab navigator - for authenticated users */}
+        <Stack.Screen
+          name="(tabs)"
+          options={{ headerShown: false }}
+          redirect={!isAuthenticated}
+        />
 
         {/* Add sleep entry modal */}
         <Stack.Screen

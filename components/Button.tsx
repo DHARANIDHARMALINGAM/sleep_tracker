@@ -24,6 +24,7 @@ interface ButtonProps {
     size?: 'small' | 'medium' | 'large';
     loading?: boolean;
     disabled?: boolean;
+    fullWidth?: boolean;
     style?: ViewStyle;
     textStyle?: TextStyle;
     icon?: React.ReactNode;
@@ -36,6 +37,7 @@ export function Button({
     size = 'medium',
     loading = false,
     disabled = false,
+    fullWidth = false,
     style,
     textStyle,
     icon,
@@ -108,6 +110,7 @@ export function Button({
                     borderColor: variant === 'ghost' ? colors.primary : 'transparent',
                     borderWidth: variant === 'ghost' ? 1 : 0,
                 },
+                fullWidth && { width: '100%' },
                 style,
             ]}
         >

@@ -1,22 +1,14 @@
 /**
  * Sleep Storage Hook
  * 
- * Provides CRUD operations for sleep entries using AsyncStorage.
- * All data is stored locally on the device.
+ * Provides CRUD operations for sleep entries using Supabase.
+ * Data is synced with the cloud and persisted in the database.
  */
 
+import { useAuth } from '@/context/AuthContext';
+import { DbSleepEntry, supabase } from '@/lib/supabase';
 import { SleepEntry, WeeklyStats } from '@/types/sleep';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
-
-const STORAGE_KEY = '@sleep_tracker_entries';
-
-/**
- * Generate a unique ID for new sleep entries
- */
-const generateId = (): string => {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-};
 
 /**
  * Calculate sleep duration in hours between two dates
@@ -71,55 +63,62 @@ export const formatDate = (date: Date | string): string => {
 };
 
 /**
- * Hook for managing sleep entries with AsyncStorage
+ * Convert database entry to app entry format
+ */
+const toSleepEntry = (dbEntry: DbSleepEntry): SleepEntry => ({
+    id: dbEntry.id,
+    bedtime: dbEntry.bedtime,
+    wakeTime: dbEntry.wake_time,
+    duration: dbEntry.duration,
+    note: dbEntry.note || undefined,
+});
+
+/**
+ * Hook for managing sleep entries with Supabase
  */
 export function useSleepStorage() {
+    const { user } = useAuth();
     const [entries, setEntries] = useState<SleepEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Load entries on mount
+    // Load entries when user changes
     useEffect(() => {
-        loadEntries();
-    }, []);
+        if (user) {
+            loadEntries();
+        } else {
+            setEntries([]);
+            setLoading(false);
+        }
+    }, [user]);
 
     /**
-     * Load all sleep entries from storage
+     * Load all sleep entries from Supabase
      */
     const loadEntries = useCallback(async () => {
+        if (!user) return;
+
         try {
             setLoading(true);
             setError(null);
-            const data = await AsyncStorage.getItem(STORAGE_KEY);
-            if (data) {
-                const parsed = JSON.parse(data) as SleepEntry[];
-                // Sort by bedtime, most recent first
-                parsed.sort((a, b) => new Date(b.bedtime).getTime() - new Date(a.bedtime).getTime());
-                setEntries(parsed);
-            } else {
-                setEntries([]);
-            }
+
+            const { data, error: fetchError } = await supabase
+                .from('sleep_entries')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('bedtime', { ascending: false });
+
+            if (fetchError) throw fetchError;
+
+            const sleepEntries = (data || []).map(toSleepEntry);
+            setEntries(sleepEntries);
         } catch (e) {
             console.error('Error loading sleep entries:', e);
             setError('Failed to load sleep data');
         } finally {
             setLoading(false);
         }
-    }, []);
-
-    /**
-     * Save entries to storage
-     */
-    const saveEntries = async (newEntries: SleepEntry[]) => {
-        try {
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newEntries));
-            setEntries(newEntries);
-        } catch (e) {
-            console.error('Error saving sleep entries:', e);
-            setError('Failed to save sleep data');
-            throw e;
-        }
-    };
+    }, [user]);
 
     /**
      * Add a new sleep entry
@@ -129,21 +128,29 @@ export function useSleepStorage() {
         wakeTime: Date,
         note?: string
     ): Promise<SleepEntry> => {
+        if (!user) throw new Error('User not authenticated');
+
         const duration = calculateDuration(bedtime, wakeTime);
 
-        const newEntry: SleepEntry = {
-            id: generateId(),
-            bedtime: bedtime.toISOString(),
-            wakeTime: wakeTime.toISOString(),
-            duration,
-            note: note?.trim() || undefined,
-        };
+        const { data, error: insertError } = await supabase
+            .from('sleep_entries')
+            .insert({
+                user_id: user.id,
+                bedtime: bedtime.toISOString(),
+                wake_time: wakeTime.toISOString(),
+                duration,
+                note: note?.trim() || null,
+            })
+            .select()
+            .single();
 
-        const updatedEntries = [newEntry, ...entries];
-        await saveEntries(updatedEntries);
+        if (insertError) throw insertError;
+
+        const newEntry = toSleepEntry(data);
+        setEntries(prev => [newEntry, ...prev]);
 
         return newEntry;
-    }, [entries]);
+    }, [user]);
 
     /**
      * Update an existing sleep entry
@@ -154,42 +161,57 @@ export function useSleepStorage() {
         wakeTime: Date,
         note?: string
     ): Promise<SleepEntry | null> => {
-        const index = entries.findIndex(e => e.id === id);
-        if (index === -1) return null;
+        if (!user) throw new Error('User not authenticated');
 
         const duration = calculateDuration(bedtime, wakeTime);
 
-        const updatedEntry: SleepEntry = {
-            id,
-            bedtime: bedtime.toISOString(),
-            wakeTime: wakeTime.toISOString(),
-            duration,
-            note: note?.trim() || undefined,
-        };
+        const { data, error: updateError } = await supabase
+            .from('sleep_entries')
+            .update({
+                bedtime: bedtime.toISOString(),
+                wake_time: wakeTime.toISOString(),
+                duration,
+                note: note?.trim() || null,
+            })
+            .eq('id', id)
+            .eq('user_id', user.id)
+            .select()
+            .single();
 
-        const updatedEntries = [...entries];
-        updatedEntries[index] = updatedEntry;
+        if (updateError) throw updateError;
+        if (!data) return null;
 
-        // Re-sort after update
-        updatedEntries.sort((a, b) =>
-            new Date(b.bedtime).getTime() - new Date(a.bedtime).getTime()
-        );
+        const updatedEntry = toSleepEntry(data);
 
-        await saveEntries(updatedEntries);
+        setEntries(prev => {
+            const updated = prev.map(e => e.id === id ? updatedEntry : e);
+            // Re-sort after update
+            updated.sort((a, b) =>
+                new Date(b.bedtime).getTime() - new Date(a.bedtime).getTime()
+            );
+            return updated;
+        });
 
         return updatedEntry;
-    }, [entries]);
+    }, [user]);
 
     /**
      * Delete a sleep entry
      */
     const deleteEntry = useCallback(async (id: string): Promise<boolean> => {
-        const updatedEntries = entries.filter(e => e.id !== id);
-        if (updatedEntries.length === entries.length) return false;
+        if (!user) throw new Error('User not authenticated');
 
-        await saveEntries(updatedEntries);
+        const { error: deleteError } = await supabase
+            .from('sleep_entries')
+            .delete()
+            .eq('id', id)
+            .eq('user_id', user.id);
+
+        if (deleteError) throw deleteError;
+
+        setEntries(prev => prev.filter(e => e.id !== id));
         return true;
-    }, [entries]);
+    }, [user]);
 
     /**
      * Get a single entry by ID
@@ -206,18 +228,20 @@ export function useSleepStorage() {
     }, [entries]);
 
     /**
-     * Clear all sleep data
+     * Clear all sleep data for the current user
      */
     const clearAllData = useCallback(async (): Promise<void> => {
-        try {
-            await AsyncStorage.removeItem(STORAGE_KEY);
-            setEntries([]);
-        } catch (e) {
-            console.error('Error clearing sleep data:', e);
-            setError('Failed to clear sleep data');
-            throw e;
-        }
-    }, []);
+        if (!user) throw new Error('User not authenticated');
+
+        const { error: deleteError } = await supabase
+            .from('sleep_entries')
+            .delete()
+            .eq('user_id', user.id);
+
+        if (deleteError) throw deleteError;
+
+        setEntries([]);
+    }, [user]);
 
     /**
      * Get weekly statistics for the chart

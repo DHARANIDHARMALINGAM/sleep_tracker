@@ -9,6 +9,7 @@
  */
 
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useSleepStorage } from '@/hooks/useSleepStorage';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
     const { colors, isDark, toggleTheme } = useTheme();
+    const { signOut, user } = useAuth();
     const { clearAllData, entries } = useSleepStorage();
     const [isClearing, setIsClearing] = useState(false);
 
@@ -116,6 +118,54 @@ export default function SettingsScreen() {
                                     {entries.length > 0
                                         ? `Delete all ${entries.length} sleep entries`
                                         : 'No sleep data to delete'}
+                                </Text>
+                            </View>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Account Section */}
+                <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                    Account
+                </Text>
+                <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={[styles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                        <View style={styles.settingInfo}>
+                            <View style={[styles.iconContainer, { backgroundColor: colors.primaryLight + '20' }]}>
+                                <Ionicons name="person-outline" size={20} color={colors.primary} />
+                            </View>
+                            <View>
+                                <Text style={[styles.settingLabel, { color: colors.text }]}>Email</Text>
+                                <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                                    {user?.email || 'Not signed in'}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                    <TouchableOpacity
+                        style={styles.settingRow}
+                        onPress={() => {
+                            Alert.alert(
+                                'Sign Out',
+                                'Are you sure you want to sign out?',
+                                [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    { text: 'Sign Out', style: 'destructive', onPress: signOut },
+                                ]
+                            );
+                        }}
+                    >
+                        <View style={styles.settingInfo}>
+                            <View style={[styles.iconContainer, { backgroundColor: Colors.error + '20' }]}>
+                                <Ionicons name="log-out-outline" size={20} color={Colors.error} />
+                            </View>
+                            <View>
+                                <Text style={[styles.settingLabel, { color: Colors.error }]}>
+                                    Sign Out
+                                </Text>
+                                <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                                    Sign out of your account
                                 </Text>
                             </View>
                         </View>
